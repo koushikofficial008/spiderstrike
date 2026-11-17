@@ -756,13 +756,13 @@ class Parts {                                           // collects geometry per
 // =====================================================================
 const canvas = $('stage');
 const IS_MOBILE = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: !IS_MOBILE, alpha: false, preserveDrawingBuffer: false, powerPreference: 'low-power', stencil: false });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: false, powerPreference: 'high-performance', stencil: false });
 MAXA = Math.min(IS_MOBILE ? 4 : 16, renderer.capabilities.getMaxAnisotropy());
-let PR = Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 0.9 : 2);
+let PR = Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.65 : 2);
 renderer.setPixelRatio(PR); renderer.setSize(innerWidth, innerHeight, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.78;
-renderer.shadowMap.enabled = !IS_MOBILE; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene(), wscene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(74, innerWidth / innerHeight, 0.08, 6000); camera.rotation.order = 'YXZ';
@@ -2076,7 +2076,7 @@ let composer, finalPass, bloomPass, pendingResize = false;
 function setupPost() {
   const w = Math.max(1, innerWidth), h = Math.max(1, innerHeight);
   const rt = new THREE.WebGLRenderTarget(Math.max(1, Math.floor(w * PR)), Math.max(1, Math.floor(h * PR)), {
-    type: IS_MOBILE ? THREE.UnsignedByteType : THREE.HalfFloatType,
+    type: THREE.HalfFloatType,
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
     samples: IS_MOBILE ? 0 : 2
@@ -2085,7 +2085,6 @@ function setupPost() {
   const rp1 = new RenderPass(scene, camera), rp2 = new RenderPass(wscene, wcam); rp2.clear = false; rp2.clearDepth = true;
   // Tight, high-threshold bloom so only emissive optics/muzzle flashes glow without washing out or blurring the scene
   bloomPass = new UnrealBloomPass(new THREE.Vector2(Math.floor(w * 0.35), Math.floor(h * 0.35)), 0.18, 0.25, 1.85);
-  if (IS_MOBILE) bloomPass.enabled = false;
   finalPass = new ShaderPass({ uniforms: { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(w * PR, h * PR) }, uTime: { value: 0 }, uDamage: { value: 0 }, uLow: { value: 0 } },
     vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
     fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uTime, uDamage, uLow; varying vec2 vUv;
@@ -2275,8 +2274,6 @@ input.joyX = 0; input.joyY = 0; input.crouchToggle = false; input.sprintToggle =
   };
   joyZone.addEventListener('touchend', endJoy);
   joyZone.addEventListener('touchcancel', endJoy);
-  window.addEventListener('touchend', endJoy, { passive: true });
-  window.addEventListener('touchcancel', endJoy, { passive: true });
 
   // Touch screen to look around (right half + fire button drag)
   const onLookStart = (e) => {
@@ -2466,7 +2463,7 @@ function frame() {
   cloudDome.position.copy(camera.position); finalPass.uniforms.uTime.value = T;
   composer.render(dt);
   // adaptive resolution: step down gently only if GPU struggles, never below 1.0x so image stays crisp
-  if (state === 'playing') { fpsAcc += raw; fpsN++; if (fpsAcc > 1.0) { const ms = fpsAcc / fpsN * 1000; $('fps').textContent = (1000 / ms).toFixed(0) + ' fps · ' + PR.toFixed(2) + 'x'; slow = ms > 25 ? slow + 1 : 0; fpsAcc = 0; fpsN = 0; const minPR = IS_MOBILE ? 0.65 : 1.15; if (slow >= 2 && PR > minPR) { PR = Math.max(minPR, PR - 0.12); slow = 0; onResize(); } } }
+  if (state === 'playing') { fpsAcc += raw; fpsN++; if (fpsAcc > 1.0) { const ms = fpsAcc / fpsN * 1000; $('fps').textContent = (1000 / ms).toFixed(0) + ' fps · ' + PR.toFixed(2) + 'x'; slow = ms > 25 ? slow + 1 : 0; fpsAcc = 0; fpsN = 0; const minPR = IS_MOBILE ? 1.0 : 1.15; if (slow >= 2 && PR > minPR) { PR = Math.max(minPR, PR - 0.12); slow = 0; onResize(); } } }
 }
 
 // =====================================================================
