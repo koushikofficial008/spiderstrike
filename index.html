@@ -1805,7 +1805,7 @@ function updateRobots(dt, t) {
     if (push > 0.002 && moved < T.speed * dt * 0.4 && rb.blocked <= 0 && rb.state === 'chase') { rb.blocked = R(0.9, 1.7); rb.side = (-uz * (rb.x - ox) + ux * (rb.z - oz)) >= 0 ? 1 : (Math.random() < 0.5 ? 1 : -1); }
     const fx = face || spd < 0.8 ? ux : rb.vx / spd, fz = face || spd < 0.8 ? uz : rb.vz / spd; rb.yaw += clamp(wrapA(Math.atan2(-fx, -fz) - rb.yaw), -T.turn * dt, T.turn * dt);
     // ---- gait
-    const cy = Math.cos(rb.yaw), sy = Math.sin(rb.yaw), stepping = [0, 0]; for (const lg of rb.legs) if (lg.t < 1) stepping[lg.grp]++;
+    const cy = Math.cos(rb.yaw), sy = Math.sin(rb.yaw); let stepping0 = 0, stepping1 = 0; for (const lg of rb.legs) if (lg.t < 1) { if (lg.grp === 0) stepping0++; else stepping1++; }
     const dur = clamp(0.19 - spd * 0.016, 0.075, 0.19) * Math.sqrt(s), th = 0.27 * s, attack = rb.state === 'windup' || rb.state === 'strike';
     let sum = 0, fr = 0, re = 0, lf = 0, rt = 0;
     for (let i = 0; i < LEGS; i++) { const lg = rb.legs[i], r = RESTS[i], k = i % 4;
@@ -1813,7 +1813,7 @@ function updateRobots(dt, t) {
       const tx = rb.x + (r.x * cy + r.z * sy) * s, tz = rb.z + (-r.x * sy + r.z * cy) * s;
       if (lg.t < 1) { lg.t += dt / lg.dur; const e = Math.min(1, lg.t), q = e * e * (3 - 2 * e); lg.foot.lerpVectors(lg.from, lg.to, q); lg.foot.y += Math.sin(e * PI) * 0.24 * s;
         if (lg.t >= 1) { lg.foot.copy(lg.to); if (stepBudget >= 1 && dist < 45) { stepBudget--; sRobotStep(lg.foot, s > 1.4); if (s > 1.4 || Math.random() < 0.3) smoke.spawn(lg.foot.x, lg.foot.y + 0.05, lg.foot.z, RS(0.4), R(0.2, 0.6), RS(0.4), R(0.4, 0.8), 0.1 * s, 0.45 * s, 0.6, 0.52, 0.4, 0.35, { drag: 3, wind: 0.5 }); } } }
-      else { const d = Math.hypot(lg.foot.x - tx, lg.foot.z - tz); if (d > th && (stepping[1 - lg.grp] === 0 || d > th * 2.6)) { lg.from.copy(lg.foot); const lx = tx + rb.vx * dur * 1.5, lz = tz + rb.vz * dur * 1.5; lg.to.set(lx, heightAt(lx, lz), lz); lg.t = 0; lg.dur = dur; stepping[lg.grp]++; } }
+      else { const d = Math.hypot(lg.foot.x - tx, lg.foot.z - tz); if (d > th && ((lg.grp === 0 ? stepping1 : stepping0) === 0 || d > th * 2.6)) { lg.from.copy(lg.foot); const lx = tx + rb.vx * dur * 1.5, lz = tz + rb.vz * dur * 1.5; lg.to.set(lx, heightAt(lx, lz), lz); lg.t = 0; lg.dur = dur; if (lg.grp === 0) stepping0++; else stepping1++; } }
       const fyv = lg.t < 1 ? lerp(lg.from.y, lg.to.y, lg.t) : lg.foot.y; sum += fyv; if (k === 0) fr += fyv; if (k === 3) re += fyv; if (i < 4) lf += fyv; else rt += fyv; }
     const ty = sum / LEGS + T.ride * s + Math.sin(t * 9 + rb.slot) * 0.012 * s * clamp(spd, 0, 1) - (rb.state === 'windup' ? 0.1 * s : 0);
     rb.y = damp(rb.y, ty, 12, dt); rb.pitch = damp(rb.pitch, Math.atan2((fr - re) / 2, 1.7 * s) + (rb.state === 'windup' ? 0.38 : rb.state === 'strike' ? -0.3 : 0) + (rb.stagger > 0 ? 0.1 : 0), 10, dt); rb.roll = damp(rb.roll, Math.atan2((rt - lf) / 4, 1.5 * s), 8, dt);
@@ -1989,7 +1989,7 @@ function toggleFullscreen() {
   }
 }
 const handleDeploy = (e) => {
-  if (state === 'loading') return;
+  if (state === 'loading' || state === 'playing') return;
   if (e && e.type === 'touchend') e.preventDefault();
   audioInit();
   if (noLock || isTouch) {
@@ -2011,7 +2011,15 @@ addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('keydown', (e) => { if (state !== 'playing') return; input.keys[e.code] = true; if (e.code === 'KeyR') startReload(); if (noLock && (e.code === 'Escape' || e.code === 'KeyP')) pause(); if (e.code === 'Backquote') $('fps').style.display = $('fps').style.display === 'block' ? 'none' : 'block';
   if (['Space', 'ArrowUp', 'ArrowDown', 'Tab', 'ControlLeft'].includes(e.code) || (e.ctrlKey && state === 'playing')) e.preventDefault(); });
 addEventListener('keyup', (e) => { input.keys[e.code] = false; });
-addEventListener('blur', () => { input.keys = {}; input.fire = input.ads = false; });
+function resetTransientInput() {
+  input.keys = {};
+  input.fire = input.ads = false;
+  input.joyX = input.joyY = 0;
+  input.mx = input.my = 0;
+  for (const id of ['btn-fire', 'btn-ads', 'btn-crouch', 'btn-sprint']) $(id)?.classList.remove('act');
+}
+addEventListener('blur', resetTransientInput);
+document.addEventListener('visibilitychange', () => { if (document.hidden) resetTransientInput(); });
 
 // =====================================================================
 //  MOBILE TOUCH CONTROLS & LOOK AROUND
@@ -2178,6 +2186,19 @@ input.joyX = 0; input.joyY = 0; input.crouchToggle = false; input.sprintToggle =
   }, { passive: false });
   document.addEventListener('fullscreenchange', syncFs);
   document.addEventListener('webkitfullscreenchange', syncFs);
+
+  // Release touch state when the page loses focus so controls cannot remain stuck.
+  const resetTouchControls = () => {
+    joyId = lookId = fireId = null;
+    input.joyX = input.joyY = 0;
+    input.fire = input.ads = false;
+    joyKnob.style.transform = 'translate3d(0px, 0px, 0)';
+    joyBase.style.left = ''; joyBase.style.top = ''; joyBase.style.bottom = '';
+    btnFire.classList.remove('act');
+    for (const id of ['btn-ads', 'btn-crouch', 'btn-sprint']) $(id).classList.remove('act');
+  };
+  addEventListener('blur', resetTouchControls);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) resetTouchControls(); });
 }
 
 
