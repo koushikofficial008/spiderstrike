@@ -649,16 +649,20 @@ function grassMask(x, z) {
   for (let i = 0; i < PADS.length; i++) { const p = PADS[i]; g *= smooth(p.r - 2, p.r + 2.5, Math.hypot(x - p.x, z - p.z)); }
   return g;
 }
-const TERR = 280, SPLAT = 256;
+const MAP_RADIUS = 48.5, TERR = 50, SPLAT = 100;
 function buildTerrain() {
-  const N = 220, n1 = N + 1, pos = new Float32Array(n1 * n1 * 3), uv = new Float32Array(n1 * n1 * 2), idx = new Uint32Array(N * N * 6);
+  const N = 180, n1 = N + 1, pos = new Float32Array(n1 * n1 * 3), uv = new Float32Array(n1 * n1 * 2), indices = [];
   const warp = (s) => s * (0.3 + 0.7 * s * s) * TERR;
   for (let j = 0, k = 0; j < n1; j++) for (let i = 0; i < n1; i++, k++) { const x = warp(i / N * 2 - 1), z = warp(j / N * 2 - 1);
     pos[k * 3] = x; pos[k * 3 + 1] = heightAt(x, z); pos[k * 3 + 2] = z; uv[k * 2] = x / 5.5; uv[k * 2 + 1] = z / 5.5; }
-  for (let j = 0, q = 0; j < N; j++) for (let i = 0; i < N; i++) { const a = j * n1 + i, b = a + n1, c = a + 1, d = b + 1; idx[q++] = a; idx[q++] = b; idx[q++] = c; idx[q++] = b; idx[q++] = d; idx[q++] = c; }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeVertexNormals();
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const a = j * n1 + i, b = a + n1, c = a + 1, d = b + 1;
+    const inside = (v) => Math.hypot(pos[v * 3], pos[v * 3 + 2]) <= MAP_RADIUS;
+    if (inside(a) && inside(b) && inside(c)) indices.push(a, b, c);
+    if (inside(b) && inside(d) && inside(c)) indices.push(b, d, c);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(indices); g.computeVertexNormals();
   // splat: R grass, G grime/ruts, B macro tone
-  const S = 1024, sd = new Uint8Array(S * S * 4);
+  const S = 512, sd = new Uint8Array(S * S * 4);
   for (let j = 0, k = 0; j < S; j++) for (let i = 0; i < S; i++, k += 4) { const x = (i / S - 0.5) * SPLAT, z = (j / S - 0.5) * SPLAT, rd = roadDist(x, z);
     let grime = (1 - smooth(0.25, 0.6, Math.abs(rd - 0.85))) * 0.5 * smooth(0.3, 0.7, fbm(x * 0.3, z * 0.3, 2));
     for (const p of PADS) grime = Math.max(grime, (1 - smooth(p.r * 0.3, p.r + 1, Math.hypot(x - p.x, z - p.z))) * 0.28 * fbm(x * 0.2 + 5, z * 0.2, 3) * 1.6);
@@ -679,7 +683,7 @@ function buildTerrain() {
         diffuseColor.rgb *= 1.0 - sp.g * 0.62;`);
   };
   const mesh = new THREE.Mesh(g, mat); mesh.receiveShadow = true; mesh.castShadow = false; mesh.matrixAutoUpdate = false; scene.add(mesh);
-  const far = new THREE.Mesh(new THREE.CircleGeometry(5200, 48).rotateX(-PI / 2), new THREE.MeshStandardMaterial({ color: 0x8a7858, roughness: 1, envMapIntensity: ENVI })); far.position.y = -8; scene.add(far);
+
   MAT.dirtFill = M(TX.dirt, { surf: 'dirt' });
 }
 
@@ -933,11 +937,11 @@ function buildOutpost() {
   tower(26, 17, 0.2); mast(-27, -27); floodlight(-11, -20.5, 0.6); floodlight(10, 21, 3.6); generator(-13, -18, 0.28);
   tires(8.6, -22, 4); tires(-6, 17, 3); tires(21, 6, 2); tires(21.8, 6.6, 3); wreck();
   for (const [x, z, s] of [[-35, 14, 2.6], [31, 31, 3.2], [-10, 36, 2.2], [40, -6, 2.4], [1, -40, 3], [-38, -20, 2.8], [-20, 27, 1.5], [12, 34, 1.4], [-42, -2, 1.8], [22, -35, 1.7], [-4, -31, 1.2], [37, 11, 1.3], [-14, -34, 1.6]]) rock(x, z, s);
-  for (let i = 0; i < 46; i++) { const a = rr(0, TAU), r = rr(52, 150); rock(Math.cos(a) * r, Math.sin(a) * r, rr(0.8, 4.2), false); }
+
   // pebbles
   const pg = new THREE.IcosahedronGeometry(1, 1); { const p = pg.attributes.position, v = new V3(); for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); v.multiplyScalar(0.7 + vnoise3(v.x * 2 + 4, v.y * 2, v.z * 2) * 0.6); p.setXYZ(i, v.x, v.y * 0.7, v.z); } pg.computeVertexNormals(); }
-  const pim = new THREE.InstancedMesh(pg, MAT.rock, 700), m = new M4(), q = new Q4(), e = new THREE.Euler();
-  for (let i = 0; i < 700; i++) { const a = rr(0, TAU), r = Math.sqrt(rnd()) * 62, x = Math.cos(a) * r, z = Math.sin(a) * r, s = rr(0.03, 0.16) * (rnd() < 0.08 ? 2.4 : 1); e.set(rr(0, 3), rr(0, 3), rr(0, 3)); m.compose(_pp.set(x, heightAt(x, z) + s * 0.2, z), q.setFromEuler(e), _ps.set(s, s, s)); pim.setMatrixAt(i, m); }
+  const pebbleCount = 420, pim = new THREE.InstancedMesh(pg, MAT.rock, pebbleCount), m = new M4(), q = new Q4(), e = new THREE.Euler();
+  for (let i = 0; i < pebbleCount; i++) { const a = rr(0, TAU), r = Math.sqrt(rnd()) * MAP_RADIUS, x = Math.cos(a) * r, z = Math.sin(a) * r, s = rr(0.03, 0.16) * (rnd() < 0.08 ? 2.4 : 1); e.set(rr(0, 3), rr(0, 3), rr(0, 3)); m.compose(_pp.set(x, heightAt(x, z) + s * 0.2, z), q.setFromEuler(e), _ps.set(s, s, s)); pim.setMatrixAt(i, m); }
   pim.castShadow = pim.receiveShadow = true; pim.matrixAutoUpdate = false; scene.add(pim);
 }
 function buildGrass() {
@@ -958,8 +962,8 @@ function buildGrass() {
       float wh = position.y * position.y; mvPosition.x += ws * wh; mvPosition.z += ws * wh * 0.5;
       mvPosition = modelViewMatrix * mvPosition; gl_Position = projectionMatrix * mvPosition;`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = normalize(vNormal);'); };
-  const MAXG = IS_MOBILE ? 18000 : 46000, im = new THREE.InstancedMesh(g, mat, MAXG), m = new M4(), q = new Q4(), e = new THREE.Euler(), c = new THREE.Color(); let k = 0, tries = 0;
-  while (k < MAXG && tries < MAXG * 12) { tries++; const a = rr(0, TAU), r = Math.sqrt(rnd()) * 96, x = Math.cos(a) * r, z = Math.sin(a) * r, gm = grassMask(x, z);
+  const MAXG = IS_MOBILE ? 4600 : 11700, im = new THREE.InstancedMesh(g, mat, MAXG), m = new M4(), q = new Q4(), e = new THREE.Euler(), c = new THREE.Color(); let k = 0, tries = 0;
+  while (k < MAXG && tries < MAXG * 12) { tries++; const a = rr(0, TAU), r = Math.sqrt(rnd()) * MAP_RADIUS, x = Math.cos(a) * r, z = Math.sin(a) * r, gm = grassMask(x, z);
     if (rnd() > gm * (1 - smooth(40, 96, r) * 0.86) || footprintBlocked(x, z, 0.1)) continue;
     const s = rr(0.24, 0.6) * (0.7 + gm * 0.5) * (rnd() < 0.07 ? 1.7 : 1); e.set(0, rr(0, TAU), 0); m.compose(_pp.set(x, heightAt(x, z) - 0.02, z), q.setFromEuler(e), _ps.set(s * rr(1, 1.5), s, s * rr(1, 1.5))); im.setMatrixAt(k, m);
     const t = clamp(fbm(x * 0.09 + 3, z * 0.09 + 8, 2) * 1.5 - 0.3 + rr(-0.2, 0.2), 0, 1); c.setRGB(lerp(0.34, 0.64, t), lerp(0.37, 0.55, t), lerp(0.15, 0.27, t), THREE.SRGBColorSpace); im.setColorAt(k, c); k++; }
@@ -1569,7 +1573,7 @@ function updatePlayer(dt, t) {
   if (pl.ground && k.Space && !pl.jumpHeld && pl.alive) { pl.vel.y = 6.8; pl.ground = false; sStep(1.1, true); } pl.jumpHeld = !!k.Space;
   pl.vel.y -= 21 * dt; p.x += pl.vel.x * dt; p.z += pl.vel.z * dt; p.y += pl.vel.y * dt;
   const oy = p.y; let floor = collide(p, 0.36, p.y, p.y + (pl.crouching ? 1.15 : 1.8), 0.42);
-  const r = Math.hypot(p.x, p.z); if (r > 48.5) { p.x *= 48.5 / r; p.z *= 48.5 / r; }
+  const r = Math.hypot(p.x, p.z); if (r > MAP_RADIUS) { p.x *= MAP_RADIUS / r; p.z *= MAP_RADIUS / r; }
   floor = Math.max(floor, heightAt(p.x, p.z));
   if (p.y <= floor) { if (!pl.ground && pl.vel.y < -4) { pl.land = Math.min(1, -pl.vel.y / 12); sLand(pl.land); } p.y = floor; pl.vel.y = 0; pl.ground = true; }
   else if (pl.ground) { if (p.y - floor < 0.45) { p.y = floor; pl.vel.y = 0; } else pl.ground = false; }
@@ -2294,7 +2298,7 @@ const SND_B64 = {"shot1":"SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYyLjEyLjEwMQAAAAAAAA
     await setLoad('POURING CONCRETE'); buildTexturesB();
     await setLoad('STITCHING FABRIC'); buildTexturesC(); buildMaterials();
     await setLoad('SHAPING TERRAIN'); buildTerrain();
-    await setLoad('RAISING THE OUTPOST'); buildRocks(); buildOutpost(); buildDistant();
+    await setLoad('RAISING THE OUTPOST'); buildRocks(); buildOutpost();
     await setLoad('GROWING GRASS'); buildGrass();
     await setLoad('ARMING'); buildFX(); buildWeapon(); buildRobots(); setupPost(); resetPlayer(); weaponRoot.visible = false;
     await setLoad('COMPILING SHADERS'); renderer.compile(scene, camera); renderer.compile(wscene, wcam);
