@@ -2343,7 +2343,7 @@ function connectMultiplayer() {
     else if(msg.type==='respawned')syncRemoteSpider(msg.player);
     else if(msg.type==='playerHit'){
       if(msg.targetId===mp.id){hurtPlayer(msg.damage,new V3(player.pos.x,player.pos.y+0.5,player.pos.z-1),T); if(playerSpider)playerSpider.hp=msg.hp;}
-      else {const target=remotePlayers.get(msg.targetId); if(target&&target.alive){target.hp=msg.hp; const dir=new V3(target.x-player.pos.x,0.2,target.z-player.pos.z).normalize(); damageRobot(target,msg.damage,new V3(target.x,target.y+0.45,target.z),dir,!!msg.headshot,T);}}
+      else {const target=remotePlayers.get(msg.targetId); if(target&&target.alive){target.hp=msg.hp+msg.damage; const dir=new V3(target.x-player.pos.x,0.2,target.z-player.pos.z).normalize(); damageRobot(target,msg.damage,new V3(target.x,target.y+0.45,target.z),dir,!!msg.headshot,T);}}
     } else if(msg.type==='full'){mp.status='full';console.warn('Spider Strike match is full');}
   });
   ws.addEventListener('close',()=>{mp.status='offline';mp.ws=null;});
@@ -2354,7 +2354,7 @@ function updateNetSpider(rb,dt,t) {
   if(!target)return;
   const a=rb.isLocalPlayer?1:clamp(dt*18,0,1),oldX=rb.x,oldZ=rb.z;
   rb.x=lerp(rb.x,target.x,a); rb.z=lerp(rb.z,target.z,a);
-  rb.vx=dt>0?(rb.x-oldX)/dt:0; rb.vz=dt>0?(rb.z-oldZ)/dt;
+  rb.vx=dt>0?(rb.x-oldX)/dt:0; rb.vz=dt>0?(rb.z-oldZ)/dt:0;
   const speed=Math.hypot(rb.vx,rb.vz),s=rb.T.s,base=rb.slot*LEGS;
   rb.y=lerp(rb.y,heightAt(rb.x,rb.z)+rb.T.ride*s,clamp(dt*14,0,1));
   rb.yaw+=wrapA(target.yaw-rb.yaw)*clamp(dt*18,0,1);
