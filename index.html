@@ -2342,7 +2342,7 @@ function connectMultiplayer() {
   if (mp.ws && (mp.ws.readyState===WebSocket.OPEN || mp.ws.readyState===WebSocket.CONNECTING)) return;
   if (mp.reconnectTimer) { clearTimeout(mp.reconnectTimer); mp.reconnectTimer = null; }
   const scheme=location.protocol==='https:'?'wss:':'ws:';
-  const ws=new WebSocket(scheme+'//'+location.host+'/multiplayer'); mp.ws=ws; mp.status='connecting';
+  const ws=new WebSocket('wss://spiderstrike-mp.kynex.workers.dev/multiplayer'); mp.ws=ws; mp.status='connecting';
   ws.addEventListener('open',()=>{mp.status='online'; mp.retry=0; flushNetworkRespawn();});
   ws.addEventListener('message',(event)=>{
     let msg; try{msg=JSON.parse(event.data);}catch{return;}
