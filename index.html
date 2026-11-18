@@ -571,10 +571,10 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false
 MAXA = Math.min(16, renderer.capabilities.getMaxAnisotropy());
 const IS_MOBILE = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 if (IS_MOBILE) MAXA = Math.min(8, MAXA);
-let PR = Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.65 : 2);
+let PR = Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.25 : 1.5);
 renderer.setPixelRatio(PR); renderer.setSize(innerWidth, innerHeight, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.78;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.68;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene(), wscene = new THREE.Scene();
@@ -586,7 +586,7 @@ const FOG_COL = new THREE.Color(0xa9bdd2);
 scene.fog = new THREE.FogExp2(FOG_COL, 0.00085);
 
 const sky = new Sky(); sky.scale.setScalar(450000);
-{ const u = sky.material.uniforms; u.turbidity.value = 3.2; u.rayleigh.value = 1.15; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.82; u.sunPosition.value.copy(SUN); }
+{ const u = sky.material.uniforms; u.turbidity.value = 2.6; u.rayleigh.value = 0.82; u.mieCoefficient.value = 0.0022; u.mieDirectionalG.value = 0.78; u.sunPosition.value.copy(SUN); }
 scene.add(sky);
 
 // image-based light: a soft analytic sky so reflections stay clean
@@ -596,32 +596,32 @@ envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 48, 24), new THREE.Shad
   fragmentShader: `varying vec3 vD; uniform vec3 sun; void main(){ vec3 d=normalize(vD); float h=d.y;
     vec3 zen=vec3(0.12,0.26,0.56), hor=vec3(0.62,0.67,0.72), gnd=vec3(0.20,0.16,0.11);
     vec3 c = h>0. ? mix(hor,zen,pow(h,0.5)) : mix(hor*0.7,gnd,smoothstep(0.,-0.12,h));
-    float s=max(dot(d,sun),0.); c += vec3(1.,0.84,0.62)*(pow(s,10.)*0.45+pow(s,160.)*5.); gl_FragColor=vec4(c,1.); }` })));
+    float s=max(dot(d,sun),0.); c += vec3(1.,0.84,0.62)*(pow(s,10.)*0.28+pow(s,160.)*2.2); gl_FragColor=vec4(c,1.); }` })));
 const pmrem = new THREE.PMREMGenerator(renderer);
 const envTex = pmrem.fromScene(envScene, 0.01).texture;
 scene.environment = envTex; wscene.environment = envTex;
 
-const SUN_I = 4.15, SUN_COL = 0xfff0da;
+const SUN_I = 2.8, SUN_COL = 0xfff0da;
 const sun = new THREE.DirectionalLight(SUN_COL, SUN_I); sun.position.copy(SUN).multiplyScalar(170); sun.castShadow = true;
-sun.shadow.mapSize.set(IS_MOBILE ? 1024 : 2048, IS_MOBILE ? 1024 : 2048); { const c = sun.shadow.camera; c.left = -58; c.right = 58; c.top = 58; c.bottom = -58; c.near = 40; c.far = 330; }
+sun.shadow.mapSize.set(IS_MOBILE ? 512 : 1024, IS_MOBILE ? 512 : 1024); { const c = sun.shadow.camera; c.left = -58; c.right = 58; c.top = 58; c.bottom = -58; c.near = 40; c.far = 330; }
 sun.shadow.bias = -0.00035; sun.shadow.normalBias = 0.045;
 scene.add(sun, sun.target, new THREE.HemisphereLight(0xc4d8f8, 0x947c5e, 0.36));
 
 // clouds
-const cloudDome = new THREE.Mesh(new THREE.SphereGeometry(3000, 48, 24), new THREE.ShaderMaterial({ side: THREE.BackSide, transparent: true, depthWrite: false, fog: false,
+const cloudDome = new THREE.Mesh(new THREE.SphereGeometry(3000, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, transparent: true, depthWrite: false, fog: false,
   uniforms: { uTime, uSun: { value: SUN } },
   vertexShader: `varying vec3 vD; void main(){ vD=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
   fragmentShader: `varying vec3 vD; uniform float uTime; uniform vec3 uSun;
     float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
     float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
-    float fbm(vec2 p){ float s=0., a=.5; for(int i=0;i<5;i++){ s+=a*n(p); p=p*2.03+vec2(17.,9.); a*=.5; } return s; }
+    float fbm(vec2 p){ float s=0., a=.5; for(int i=0;i<3;i++){ s+=a*n(p); p=p*2.03+vec2(17.,9.); a*=.5; } return s; }
     void main(){ vec3 d=normalize(vD); if(d.y<0.012) discard;
       vec2 p=d.xz/(d.y+0.12)*1.5 + uTime*vec2(0.006,0.002);
-      float c=fbm(p); float cov=smoothstep(0.5,0.8,c+0.1*fbm(p*4.));
-      float c2=fbm(p+uSun.xz*0.14); float lit=clamp(0.55+(c-c2)*3.5,0.,1.);
+      float c=fbm(p); float cov=smoothstep(0.48,0.78,c+0.08*fbm(p*3.));
+      float lit=clamp(0.62+(c-0.5)*1.8,0.,1.);
       float sd=pow(max(dot(d,uSun),0.),6.);
-      vec3 col=mix(vec3(0.5,0.55,0.64), vec3(1.25,1.17,1.06)+vec3(0.6,0.45,0.25)*sd, lit);
-      gl_FragColor=vec4(col, cov*smoothstep(0.012,0.2,d.y)*0.93); }` }));
+      vec3 col=mix(vec3(0.43,0.48,0.57), vec3(0.92,0.94,0.98)+vec3(0.22,0.18,0.12)*sd, lit);
+      gl_FragColor=vec4(col, cov*smoothstep(0.012,0.2,d.y)*0.72); }` }));
 cloudDome.renderOrder = -5; cloudDome.frustumCulled = false; scene.add(cloudDome);
 
 // =====================================================================
@@ -1899,12 +1899,12 @@ function setupPost() {
     type: THREE.HalfFloatType,
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
-    samples: IS_MOBILE ? 0 : 2
+    samples: 0
   });
   composer = new EffectComposer(renderer, rt); composer.setPixelRatio(PR); composer.setSize(w, h);
   const rp1 = new RenderPass(scene, camera), rp2 = new RenderPass(wscene, wcam); rp2.clear = false; rp2.clearDepth = true;
   // Tight, high-threshold bloom so only emissive optics/muzzle flashes glow without washing out or blurring the scene
-  bloomPass = new UnrealBloomPass(new THREE.Vector2(Math.floor(w * 0.35), Math.floor(h * 0.35)), 0.18, 0.25, 1.85);
+  bloomPass = new UnrealBloomPass(new THREE.Vector2(Math.floor(w * 0.25), Math.floor(h * 0.25)), 0.1, 0.2, 2.1);
   finalPass = new ShaderPass({ uniforms: { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(w * PR, h * PR) }, uTime: { value: 0 }, uDamage: { value: 0 }, uLow: { value: 0 } },
     vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
     fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uTime, uDamage, uLow; varying vec2 vUv;
@@ -1947,7 +1947,7 @@ function applyResizeNow() {
   if (composer) {
     composer.setPixelRatio(PR);
     composer.setSize(w, h);
-    if (bloomPass) bloomPass.setSize(Math.floor(w * 0.35), Math.floor(h * 0.35));
+    if (bloomPass) bloomPass.setSize(Math.floor(w * 0.25), Math.floor(h * 0.25));
     finalPass.uniforms.uRes.value.set(w * PR, h * PR);
   }
 }
@@ -1973,7 +1973,7 @@ function resetGame() {
   for (const b of bolts) { b.on = false; b.m.visible = false; } for (const p of pickups) { p.on = false; p.g.visible = false; }
   resetPlayer(); wave.n = 0; wave.active = false; wave.inter = 2.5; wave.queue = []; hostilesNow = 0; $('feed').innerHTML = '';
 }
-function beginPlay() { audioInit(); if (state === 'menu' || state === 'dead') resetGame(); ensurePlayerSpider(); connectMultiplayer(); state = 'playing'; overlay.classList.add('off'); $('hud').classList.add('on'); weaponRoot.visible = true; last = performance.now(); networkSend({ type:'respawn', x:player.pos.x, y:player.pos.y, z:player.pos.z }); }
+function beginPlay() { audioInit(); if (state === 'menu' || state === 'dead') resetGame(); ensurePlayerSpider(); state = 'playing'; overlay.classList.add('off'); $('hud').classList.add('on'); weaponRoot.visible = true; last = performance.now(); requestNetworkRespawn(); connectMultiplayer(); }
 function gameOver() { if (state !== 'playing') return; state = 'dead'; if (document.pointerLockElement) document.exitPointerLock(); showOverlay('dead'); }
 function pause() { if (state !== 'playing') return; state = 'paused'; input.fire = input.ads = false; input.keys = {}; showOverlay('paused'); }
 function enterFullscreen() {
@@ -2282,7 +2282,7 @@ function frame() {
   cloudDome.position.copy(camera.position); finalPass.uniforms.uTime.value = T;
   composer.render(dt);
   // adaptive resolution: step down gently only if GPU struggles, never below 1.0x so image stays crisp
-  if (state === 'playing') { fpsAcc += raw; fpsN++; if (fpsAcc > 1.0) { const ms = fpsAcc / fpsN * 1000; $('fps').textContent = (1000 / ms).toFixed(0) + ' fps · ' + PR.toFixed(2) + 'x'; slow = ms > 25 ? slow + 1 : 0; fpsAcc = 0; fpsN = 0; const minPR = IS_MOBILE ? 1.0 : 1.15; if (slow >= 2 && PR > minPR) { PR = Math.max(minPR, PR - 0.12); slow = 0; onResize(); } } }
+  if (state === 'playing') { fpsAcc += raw; fpsN++; if (fpsAcc > 1.0) { const ms = fpsAcc / fpsN * 1000; $('fps').textContent = (1000 / ms).toFixed(0) + ' fps · ' + PR.toFixed(2) + 'x'; slow = ms > 20 ? slow + 1 : 0; fpsAcc = 0; fpsN = 0; const minPR = IS_MOBILE ? 0.8 : 0.95; if (slow >= 2 && PR > minPR) { PR = Math.max(minPR, PR - 0.15); slow = 0; onResize(); } } }
 }
 
 // =====================================================================
@@ -2299,8 +2299,17 @@ const SND_B64 = {"shot1":"SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYyLjEyLjEwMQAAAAAAAA
 
 /* Shared public multiplayer match. No extra menu or game mode is added. */
 const remotePlayers = new Map();
-const mp = { ws: null, id: null, acc: 0, status: 'offline' };
-function networkSend(message) { if (mp.ws && mp.ws.readyState === WebSocket.OPEN) mp.ws.send(JSON.stringify(message)); }
+const mp = { ws: null, id: null, acc: 0, status: 'offline', wantRespawn: false, respawnSentAt: 0, retry: 0, reconnectTimer: null };
+function networkSend(message) { if (mp.ws && mp.ws.readyState === WebSocket.OPEN) { mp.ws.send(JSON.stringify(message)); return true; } return false; }
+function requestNetworkRespawn() { mp.wantRespawn = true; mp.respawnSentAt = 0; flushNetworkRespawn(); }
+function flushNetworkRespawn() { if (!mp.wantRespawn || state !== 'playing' || !player.alive) return; const now = Date.now(); if (now - mp.respawnSentAt < 900) return; if (networkSend({ type:'respawn', x:player.pos.x, y:player.pos.y, z:player.pos.z })) mp.respawnSentAt = now; }
+function reviveNetSpider(rb, data) {
+  rb.active = true; rb.alive = true; rb.deadT = 0; rb.hp = Number.isFinite(data.hp) ? data.hp : 100;
+  rb.x = finiteNet(data.x); rb.z = finiteNet(data.z); rb.y = heightAt(rb.x, rb.z) + rb.T.ride * rb.T.s;
+  rb.vx = rb.vz = rb.vy = rb.pitch = rb.roll = rb.wp = rb.wr = 0; rb.yaw = finiteNet(data.yaw);
+  rb.group.visible = true; rb.group.scale.setScalar(rb.T.s); rb.eyeMat.emissiveIntensity = 7;
+  const cy=Math.cos(rb.yaw), sy=Math.sin(rb.yaw); rb.legs.forEach((lg,i)=>{ const r=RESTS[i],fx=rb.x+(r.x*cy+r.z*sy)*rb.T.s,fz=rb.z+(-r.x*sy+r.z*cy)*rb.T.s; lg.foot.set(fx,heightAt(fx,fz),fz); lg.from.copy(lg.foot); lg.to.copy(lg.foot); lg.t=1; lg.dur=0.1; });
+}
 function ensurePlayerSpider() {
   if (playerSpider && playerSpider.active) return playerSpider;
   const rb = spawnRobot('skitter', player.pos.x, player.pos.z);
@@ -2321,7 +2330,7 @@ function syncRemoteSpider(data) {
   rb.netTarget = { x:finiteNet(data.x), y:finiteNet(data.y), z:finiteNet(data.z), yaw:finiteNet(data.yaw), pitch:finiteNet(data.pitch), moving:!!data.moving, sprinting:!!data.sprinting };
   rb.hp = Number.isFinite(data.hp) ? data.hp : rb.hp;
   if (data.alive === false && rb.alive) killRobot(rb, new V3(0,0,1), T, false);
-  if (data.alive === true && !rb.alive) { rb.active=true; rb.alive=true; rb.deadT=0; rb.hp=100; rb.group.visible=true; }
+  if (data.alive === true && !rb.alive) reviveNetSpider(rb, data);
 }
 function removeRemoteSpider(id) {
   const rb=remotePlayers.get(id);
@@ -2331,22 +2340,23 @@ function removeRemoteSpider(id) {
 }
 function connectMultiplayer() {
   if (mp.ws && (mp.ws.readyState===WebSocket.OPEN || mp.ws.readyState===WebSocket.CONNECTING)) return;
+  if (mp.reconnectTimer) { clearTimeout(mp.reconnectTimer); mp.reconnectTimer = null; }
   const scheme=location.protocol==='https:'?'wss:':'ws:';
   const ws=new WebSocket(scheme+'//'+location.host+'/multiplayer'); mp.ws=ws; mp.status='connecting';
-  ws.addEventListener('open',()=>{mp.status='online';});
+  ws.addEventListener('open',()=>{mp.status='online'; mp.retry=0; flushNetworkRespawn();});
   ws.addEventListener('message',(event)=>{
     let msg; try{msg=JSON.parse(event.data);}catch{return;}
-    if(msg.type==='welcome'){mp.id=msg.id; for(const p of msg.players||[])syncRemoteSpider(p); if(state==='playing'&&player.alive)networkSend({type:'respawn',x:player.pos.x,y:player.pos.y,z:player.pos.z});}
+    if(msg.type==='welcome'){mp.id=msg.id; for(const p of msg.players||[])syncRemoteSpider(p); if(state==='playing'&&player.alive)requestNetworkRespawn();}
     else if(msg.type==='joined')syncRemoteSpider(msg.player);
     else if(msg.type==='left')removeRemoteSpider(msg.id);
     else if(msg.type==='snapshot'){for(const p of msg.players||[])syncRemoteSpider(p);}
-    else if(msg.type==='respawned')syncRemoteSpider(msg.player);
+    else if(msg.type==='respawned'){ if(msg.player && msg.player.id===mp.id){ mp.wantRespawn=false; mp.respawnSentAt=0; } else syncRemoteSpider(msg.player); }
     else if(msg.type==='playerHit'){
       if(msg.targetId===mp.id){hurtPlayer(msg.damage,new V3(player.pos.x,player.pos.y+0.5,player.pos.z-1),T); if(playerSpider)playerSpider.hp=msg.hp;}
       else {const target=remotePlayers.get(msg.targetId); if(target&&target.alive){target.hp=msg.hp+msg.damage; const dir=new V3(target.x-player.pos.x,0.2,target.z-player.pos.z).normalize(); damageRobot(target,msg.damage,new V3(target.x,target.y+0.45,target.z),dir,!!msg.headshot,T);}}
     } else if(msg.type==='full'){mp.status='full';console.warn('Spider Strike match is full');}
   });
-  ws.addEventListener('close',()=>{mp.status='offline';mp.ws=null;});
+  ws.addEventListener('close',()=>{mp.status='offline';mp.ws=null; if(state==='playing' && !mp.reconnectTimer){ const wait=Math.min(8000,700*Math.pow(2,mp.retry++)); mp.reconnectTimer=setTimeout(()=>{mp.reconnectTimer=null;connectMultiplayer();},wait); }});
   ws.addEventListener('error',()=>{mp.status='offline';});
 }
 function updateNetSpider(rb,dt,t) {
@@ -2382,9 +2392,11 @@ function updateNetSpider(rb,dt,t) {
   femurIM.instanceMatrix.needsUpdate=true; tibiaIM.instanceMatrix.needsUpdate=true;
 }
 function multiplayerTick(dt) {
-  if(state!=='playing'||!player.alive)return;
-  mp.acc+=dt; if(mp.acc<0.05)return; mp.acc=0; ensurePlayerSpider();
-  networkSend({type:'state',x:player.pos.x,y:player.pos.y,z:player.pos.z,yaw:player.yaw,pitch:player.pitch,moving:player.speed>0.35,sprinting:player.sprinting,firing:input.fire});
+  if(state!=='playing' && state!=='dead')return;
+  mp.acc+=dt; if(mp.acc<0.1)return; mp.acc=0;
+  if(state==='playing' && player.alive) ensurePlayerSpider();
+  flushNetworkRespawn();
+  networkSend({type:'state',x:player.pos.x,y:player.pos.y,z:player.pos.z,yaw:player.yaw,pitch:player.pitch,moving:player.alive&&player.speed>0.35,sprinting:player.alive&&player.sprinting,firing:player.alive&&input.fire});
 }
 
 // =====================================================================
